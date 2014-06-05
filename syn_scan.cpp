@@ -32,8 +32,7 @@ int main(int argc, char** argv)
 	{
 	*/
 		syn_scan->syn_host(scan_ip.c_str(), 135);
-		syn_scan->make_ip();
-		syn_scan->ip_check_sum();
+		
 		syn_scan->make_tcp();
 		syn_scan->tcp_check_sum();
 		syn_scan->sendtosyn();

@@ -8,8 +8,11 @@ csyn::csyn(void)
 csyn::~csyn(void)
 {
 }
-csyn::csyn(char *plocal_ip, unsigned short nport)
+csyn::csyn(const char *plocal_ip, unsigned short nport)
 {
+	syn_local_port = nport;
+	strcpy(syn_local_ip, plocal_ip);
+
 	unsigned int ips;
 	inet_pton(AF_INET, plocal_ip, &ips);
 	char *pip = (char*)(void*)&ips;
@@ -81,10 +84,10 @@ void csyn::make_tcp()
 	tcp_head_initial.seq_num[1] = 0xb3;
 	tcp_head_initial.seq_num[2] = 0x68;
 	tcp_head_initial.seq_num[3] = 0x7a;
-	tcp_head_initial.ack_num[0] = 0xb7;
-	tcp_head_initial.ack_num[1] = 0xed;
-	tcp_head_initial.ack_num[2] = 0xcb;
-	tcp_head_initial.ack_num[3] = 0x85;
+	tcp_head_initial.ack_num[0] = 0x0;
+	tcp_head_initial.ack_num[1] = 0x0;
+	tcp_head_initial.ack_num[2] = 0x0;
+	tcp_head_initial.ack_num[3] = 0x0;//because ack is not set, ack should be 0
 	tcp_head_initial.head_len_and_lefts = 0x50;
 	tcp_head_initial.flags = 0x02;
 	tcp_head_initial.wind[0] = 0xfe;
@@ -171,45 +174,54 @@ void csyn::make_sock()
 		perror("sock");
 		exit(1);
 	}
-	/*
+	
 	struct sockaddr_in bind_sock;
 	memset((void*)&bind_sock, 0, sizeof(bind_sock));
 	bind_sock.sin_family = AF_INET;
-	inet_aton("192.168.1.103", &bind_sock.sin_addr);
-	bind_sock.sin_port = htons(8091);
+	inet_aton(syn_local_ip, &bind_sock.sin_addr);
+	bind_sock.sin_port = htons(syn_local_port);
 	bind(nsock, (sockaddr*)&bind_sock,sizeof(bind_sock));
-	*/
-
+	
+	/*
 	bool bopt = true;
 	int nret = setsockopt(nsock, IPPROTO_IP, IP_HDRINCL, (void*)&bopt, sizeof(bopt));
-
+	*/
+	struct timeval tv_out;
+	tv_out.tv_sec = 3;
+	tv_out.tv_usec = 0;
+	setsockopt(nsock,SOL_SOCKET,SO_RCVTIMEO, (char*)&tv_out, sizeof(tv_out));
 }
 
 void csyn::sendtosyn()
 {
-	memcpy(send_buf, &ip_head_initial, sizeof(ip_head_initial));
-	memcpy(send_buf + sizeof(ip_head_initial), &tcp_head_initial, sizeof(tcp_head_initial));
-	int nLens = sizeof(ip_head_initial) + sizeof(tcp_head_initial);
+	//memcpy(send_buf, &ip_head_initial, sizeof(ip_head_initial));
+	//memcpy(send_buf + sizeof(ip_head_initial), &tcp_head_initial, sizeof(tcp_head_initial));
+	memcpy(send_buf, &tcp_head_initial, sizeof(tcp_head_initial));
+	int nLens = sizeof(tcp_head_initial);
 
 	struct sockaddr_in dest_addr;
 	memset((void*)&dest_addr, 0, sizeof(dest_addr));
 	dest_addr.sin_family = AF_INET;
 	dest_addr.sin_port = htons(syn_host_port);
-	//char *pDest = "192.168.1.100";
+	/*
 	cout<<"sendto ip:"<<syn_host_ip<<endl;
 	cout<<"sendto port:"<<syn_host_port<<endl;
+	*/
 	inet_aton(syn_host_ip, &dest_addr.sin_addr);
+	
 	sendto(nsock, send_buf, nLens, 0,(struct sockaddr*)&dest_addr, sizeof(dest_addr));
+	
 }
 
 void csyn::recvsyn()
 {
 	struct sockaddr_in recv_addr;
 	int nLens = sizeof(recv_addr);
-	recv_num = recvfrom(nsock, rcv_buf, 256, 0,(struct sockaddr*)&recv_addr, (socklen_t*)&nLens);
+	
+	recv_num = read(nsock, rcv_buf, 256);
 }
 
-void csyn::syn_host(char *pdest_ip, int nport)
+void csyn::syn_host(const char *pdest_ip, int nport)
 {
 	syn_host_port = nport;
 	strcpy(syn_host_ip, pdest_ip);
@@ -225,4 +237,14 @@ void csyn::syn_host(char *pdest_ip, int nport)
 	char *pport = (char*)(void*)&nport;
 	tcp_head_initial.dest_port[0] = *(pport + 1);
 	tcp_head_initial.dest_port[1] = *pport;
+}
+
+void csyn::syn_close()
+{
+	tcp_head_initial.flags = 0x04;
+	tcp_head_initial.check_sum[0] = 0;
+	tcp_head_initial.check_sum[1] = 0;
+	tcp_check_sum();
+	
+	sendtosyn();
 }

@@ -9,6 +9,10 @@
 #include <cstring>
 
 #include <netinet/ip.h>
+#include <linux/if_ether.h>
+#include <unistd.h>
+//#include <linux/in.h>
+
 using namespace std;
 
 #ifndef _CSYN_H_
@@ -20,19 +24,19 @@ class csyn
 public:
 	csyn(void);
 	~csyn(void);
-	csyn(char *plocal_ip, unsigned short nport);
+	csyn(const char *plocal_ip, unsigned short nport);
 	void make_sock();
-	void syn_host(char *pdest_ip, int nport);
+	void syn_host(const char *pdest_ip, int nport);
 	void make_ip();
 	void ip_check_sum();
 
 	void make_tcp();
 	void tcp_check_sum();
 
-	bool judge_open();
-
 	void sendtosyn();
 	void recvsyn();
+	bool judge_open();
+	void syn_close();
 
 private:
 	typedef struct ip_head 
@@ -75,8 +79,10 @@ private:
 	int recv_num;
 
 private:
-	int syn_host_port;
+	unsigned short syn_host_port;
 	char syn_host_ip[16];
+	unsigned short syn_local_port;
+	char syn_local_ip[16];
 };
 
 #endif

@@ -8,7 +8,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <unistd.h>
-
+#include <cmath>
+#include <ctime>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include <netinet/tcp.h>
 
@@ -25,15 +28,16 @@ public:
 	~csyn(void);
 	csyn(const char *plocal_ip, unsigned short nport);
 	void make_sock();
-	void syn_host(const char *pdest_ip, int nport);
+	void close_sock();
+	void host_ip(const char *pdest_ip);
+	void host_port(unsigned short nport);
 
 	void make_tcp();
 	void tcp_check_sum();
 
 	void sendtosyn();
-	void recvsyn();
-	bool judge_open();
-	void syn_close();
+	bool recv_and_judge();
+	void host_close();
 
 private:
 	struct tcphdr tcp_head_initial;
@@ -50,6 +54,10 @@ private:
 	char syn_host_ip[16];
 	unsigned short syn_local_port;
 	char syn_local_ip[16];
+
+	unsigned int nsep_num;
+	void ip_token(char ips[], unsigned short &n1, unsigned short &n2);
+	bool check_tcp(char cbuf[], int nlen, bool &bcapture_return);
 };
 
 #endif

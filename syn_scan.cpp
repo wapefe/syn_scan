@@ -25,34 +25,36 @@ int main(int argc, char** argv)
 
 	csyn *syn_scan = new csyn(local_ip.c_str(), local_port);
 	syn_scan->make_sock();
-	/*
+	
 	fstream file_write;
 	file_write.open("syn_scan.txt", ios::out);
+
+	syn_scan->host_ip(scan_ip.c_str());
 	for (int nport = nstart; nport <= nend; ++nport)
 	{
-	*/
-		syn_scan->syn_host(scan_ip.c_str(), 135);
+	
+		syn_scan->host_port(nport);
 		
 		syn_scan->make_tcp();
 		syn_scan->tcp_check_sum();
 		syn_scan->sendtosyn();
-		syn_scan->recvsyn();
-		bool bl = syn_scan->judge_open();
+		
+		bool bl = syn_scan->recv_and_judge();
 
 		if (bl)
 		{
-			cout<<"open"<<endl;
-			syn_scan->syn_close();
-			//file_write<<"ip:"<<scan_ip<<","<<"port:"<<nport<<";"<<endl;
+			cout<<nport<<" open"<<endl;
+			syn_scan->host_close();
+			file_write<<"ip:"<<scan_ip<<","<<"port:"<<nport<<";"<<endl;
 		}
 		else
 		{
-			cout<<"no open"<<endl;
+			cout<<nport<<" no open"<<endl;
 		}
-/*
+
 	}
 	file_write.close();
-	*/
+	syn_scan->close_sock();
 	delete syn_scan;
 	return 0;
 }

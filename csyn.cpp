@@ -15,22 +15,6 @@ csyn::csyn(const char *plocal_ip, unsigned short nport)
 	
 }
 
-bool csyn::judge_open()
-{
-	if (recv_num <= 0)
-	{
-		return false;
-	}
-	char c = (*rcv_buf)&(0x0f);
-	char *ptcp_head = rcv_buf + c * 4 + 3 * 4 + 1;
-
-	if ((*ptcp_head ^ 0x12) == 0)
-	{
-		return true;
-	}
-	return false;
-}
-
 void csyn::make_sock()
 {
 	nsock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
@@ -52,12 +36,15 @@ void csyn::make_sock()
 	int nret = setsockopt(nsock, IPPROTO_IP, IP_HDRINCL, (void*)&bopt, sizeof(bopt));
 	*/
 
-	struct timeval tv_out;
-	tv_out.tv_sec = 3;
-	tv_out.tv_usec = 0;
-	setsockopt(nsock,SOL_SOCKET,SO_RCVTIMEO, (char*)&tv_out, sizeof(tv_out));
+	//超时
+	struct timeval timeouts = {1, 0};
+	setsockopt(nsock, SOL_SOCKET, SO_RCVTIMEO, &timeouts, sizeof(timeouts));
+	
 }
-
+void csyn::close_sock()
+{
+	close(nsock);
+}
 void csyn::sendtosyn()
 {
 	struct sockaddr_in dest_addr;
@@ -74,24 +61,65 @@ void csyn::sendtosyn()
 	
 }
 
-void csyn::recvsyn()
+bool csyn::recv_and_judge()
 {
-	struct sockaddr_in recv_addr;
-	int nLens = sizeof(recv_addr);
-	
-	recv_num = read(nsock, rcv_buf, 256);
+	bool bflag = false;
+	bool bcapture_return = false;
+	while (true)
+	{
+		recv_num = read(nsock, rcv_buf, 256);
+		if (recv_num <= 0)
+		{
+			break;
+		}
+		if (check_tcp(rcv_buf, recv_num, bcapture_return))
+		{
+			bflag = true;
+		}
+		
+	}
+	return bflag;
 }
-
-void csyn::syn_host(const char *pdest_ip, int nport)
+bool csyn::check_tcp(char cbuf[], int nlen, bool &bcapture_return)
+{
+	
+	//检测ack num是否为seq num + 1
+	
+	unsigned int *ptmp = (unsigned int *)cbuf + (cbuf[0] & 0x0f) + 2;
+	if (ntohl(*ptmp) == nsep_num + syn_host_port +1)
+	{
+		bcapture_return = true;
+		unsigned short ustmp = (*(ptmp + 1) & 0xffff) >> 8;
+		if ((ustmp ^ 0x012) == 0)
+		{
+			return true;
+		}
+		if ((ustmp ^ 0x014) == 0)
+		{
+			return false;
+		}
+		
+	}
+	else
+	{
+		return false;
+	}
+	
+}
+void csyn::host_ip(const char *pdest_ip)
+{
+	strcpy(syn_host_ip, pdest_ip);
+	srand(time(NULL));
+	nsep_num = rand();
+}
+void csyn::host_port(unsigned short nport)
 {
 	syn_host_port = nport;
-	strcpy(syn_host_ip, pdest_ip);
-
 }
 
-void csyn::syn_close()
+void csyn::host_close()
 {
-	
+	tcp_head_initial.fin = 1;
 	tcp_check_sum();
 	
 	sendtosyn();
@@ -103,7 +131,8 @@ void csyn::make_tcp()
 	
 	tcp_head_initial.source = htons(syn_local_port);
 	tcp_head_initial.dest = htons(syn_host_port);
-	tcp_head_initial.seq = htonl(12345);
+	
+	tcp_head_initial.seq = htonl(nsep_num + syn_host_port);
 	
 	tcp_head_initial.doff = 5;
 	tcp_head_initial.window = htons(65535);
@@ -134,17 +163,28 @@ void csyn::tcp_check_sum()
 		ptmp += 2;
 		ncheck_sum += ustmp;
 	}
-	ncheck_sum += 0xc0A8;
-	ncheck_sum += 0x0164;
-	ncheck_sum += 0xc0A8;
-	ncheck_sum += 0x0167;
+	unsigned short n1, n2;
+	ip_token(syn_local_ip, n1, n2);
+	ncheck_sum += n1;
+	ncheck_sum += n2;
+	ip_token(syn_host_ip, n1, n2);
+	ncheck_sum += n1;
+	ncheck_sum += n2;
+	//tcp包的长度为20，协议为6
 	ncheck_sum += (20 + 6);
 
-	int n1 = (ncheck_sum >> 16);
-	int n2 = (ncheck_sum & 0xffff);
+	n1 = (ncheck_sum >> 16);
+	n2 = (ncheck_sum & 0xffff);
 	ncheck_sum = n1 + n2;
 	short sum = (~ncheck_sum) & 0xffff;
 
 	tcp_head_initial.check = htons(sum);
 }
 
+void csyn::ip_token(char ips[], unsigned short &n1, unsigned short &n2)
+{
+	 unsigned int ntmp;
+	 inet_pton(AF_INET, ips, &ntmp);
+	 n1 = htons( ntmp >> 16);
+	 n2 = htons(ntmp & 0xffff);
+}

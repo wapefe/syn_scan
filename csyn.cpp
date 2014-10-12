@@ -20,7 +20,7 @@ void csyn::make_sock()
 	nsock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
 	if (nsock < 0)
 	{
-		perror("sock");
+		perror("raw_sock error");
 		exit(1);
 	}
 	
@@ -36,7 +36,7 @@ void csyn::make_sock()
 	int nret = setsockopt(nsock, IPPROTO_IP, IP_HDRINCL, (void*)&bopt, sizeof(bopt));
 	*/
 
-	//³¬Ê±
+	//è¶…æ—¶
 	struct timeval timeouts = {1, 0};
 	setsockopt(nsock, SOL_SOCKET, SO_RCVTIMEO, &timeouts, sizeof(timeouts));
 	
@@ -83,7 +83,7 @@ bool csyn::recv_and_judge()
 bool csyn::check_tcp(char cbuf[], int nlen, bool &bcapture_return)
 {
 	
-	//¼ì²âack numÊÇ·ñÎªseq num + 1
+	//æ£€æµ‹ack numæ˜¯å¦ä¸ºseq num + 1
 	
 	unsigned int *ptmp = (unsigned int *)cbuf + (cbuf[0] & 0x0f) + 2;
 	if (ntohl(*ptmp) == nsep_num + syn_host_port +1)
@@ -170,7 +170,7 @@ void csyn::tcp_check_sum()
 	ip_token(syn_host_ip, n1, n2);
 	ncheck_sum += n1;
 	ncheck_sum += n2;
-	//tcp°üµÄ³¤¶ÈÎª20£¬Ð­ÒéÎª6
+	//tcpåŒ…çš„é•¿åº¦ä¸º20ï¼Œåè®®ä¸º6
 	ncheck_sum += (20 + 6);
 
 	n1 = (ncheck_sum >> 16);
